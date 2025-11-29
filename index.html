@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Forgotten City – Tract-Level Feasibility Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Mapbox GL JS -->
+    <link
+      href="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.css"
+      rel="stylesheet"
+    />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+      .legend {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        background: white;
+        padding: 10px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+      }
+      .legend-title {
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .legend-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 3px;
+      }
+      .legend-color {
+        width: 14px;
+        height: 14px;
+        margin-right: 6px;
+        border-radius: 2px;
+      }
+      .info {
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 8px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        max-width: 320px;
+        box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <div class="info">
+      <strong>Forgotten City – Residual Land Value Map</strong><br />
+      Each tract is colored by the income-based residual land value per unit.
+      Red = negative (subsidy needed), Blue = positive (feasible). Click a tract
+      for the GEOID and value.
+    </div>
+
+    <div class="legend">
+      <div class="legend-title">L_income_based (USD per unit)</div>
+      <div class="legend-row">
+        <div class="legend-color" style="background:#b2182b;"></div>
+        <span>More negative (less feasible)</span>
+      </div>
+      <div class="legend-row">
+        <div
+          class="legend-color"
+          style="background:#f7f7f7; border: 1px solid #ccc;"
+        ></div>
+        <span>Around 0</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-color" style="background:#2166ac;"></div>
+        <span>More positive (more feasible)</span>
+      </div>
+    </div>
+
+    <script>
+      // Your Mapbox public access token
+      mapboxgl.accessToken =
+        "pk.eyJ1IjoibWVibG9vbWJlcmciLCJhIjoiY20ycWw5b3JmMTNtdTJsb21lYWZpemIyMCJ9.P-EVTtAL-ZTeKTNGCFW6Fw";
+
+      const map = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/mapbox/light-v11",
+        center: [-98.5, 39.8], // US center
+        zoom: 3.3,
+      });
+
+      map.addControl(new mapboxgl.NavigationControl(), "top-right");
+
+      map.on("load", () => {
+        // Your tileset as the vector source
+        map.addSource("tracts", {
+          type: "vector",
+          url: "mapbox://mebloomberg.d66j6kmh",
+        });
+
+        const SOURCE_LAYER_NAME = "tracts_residual_small_multifa-dryy5y";
+
+        // Choropleth fill layer
+        map.addLayer({
+          id: "tract-fills",
+          type: "fill",
+          source: "tracts",
+          "source-layer": SOURCE_LAYER_NAME,
+          paint: {
+            "fill-color": [
+              "case",
+              ["==", ["typeof", ["get", "L_income_based"]], "number"],
+              [
+                "interpolate",
+                ["linear"],
+                ["get", "L_income_based"],
+                -100000, "#b2182b",
+                0, "#f7f7f7",
+                600000, "#2166ac"
+              ],
+              "#cccccc"
+            ],
+            "fill-opacity": 0.7,
+          },
+        });
+
+        // Borders / outlines
+        map.addLayer({
+          id: "tract-borders",
+          type: "line",
+          source: "tracts",
+          "source-layer": SOURCE_LAYER_NAME,
+          paint: {
+            "line-color": "#000000",
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              3, 0.1,
+              8, 0.4,
+            ],
+            "line-opacity": 0.3,
+          },
+        });
+
+        // Popup
+        const popup = new mapboxgl.Popup({
+          closeButton: false,
+          closeOnClick: true,
+        });
+
+        map.on("click", "tract-fills", (e) => {
+          const props = e.features[0].properties;
+          const geoid = props.GEOID || "Unknown GEOID";
+          const val = props.L_income_based;
+
+          const valText =
+            val !== null && val !== undefined && !isNaN(val)
+              ? Number(val).toLocaleString("en-US", {
+                  style: "currency",
+                  currency: "USD",
+                  maximumFractionDigits: 0,
+                })
+              : "N/A";
+
+          popup
+            .setLngLat(e.lngLat)
+            .setHTML(
+              "<strong>GEOID:</strong> " +
+                geoid +
+                "<br><strong>L_income_based:</strong> " +
+                valText
+            )
+            .addTo(map);
+        });
+
+        map.on("mouseenter", "tract-fills", () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+
+        map.on("mouseleave", "tract-fills", () => {
+          map.getCanvas().style.cursor = "";
+        });
+      });
+    </script>
+  </body>
+</html>
