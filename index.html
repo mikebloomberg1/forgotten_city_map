@@ -1,8 +1,9 @@
+
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Forgotten City – Tract-Level Feasibility Map</title>
+    <title>Forgotten City – Tract-Level Feasibility Explorer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!-- Mapbox GL JS -->
     <link
@@ -11,68 +12,200 @@
     />
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js"></script>
     <style>
+      :root {
+        --bg: rgba(255, 255, 255, 0.95);
+        --shadow: 0 0 6px rgba(0, 0, 0, 0.25);
+        --border-radius: 6px;
+        --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
       body {
         margin: 0;
         padding: 0;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-          sans-serif;
+        font-family: var(--font);
       }
+
       #map {
         position: absolute;
         top: 0;
         bottom: 0;
         width: 100%;
       }
+
+      .panel {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        max-width: 780px;
+        background: var(--bg);
+        padding: 10px 12px;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+        font-size: 12px;
+      }
+
+      .panel-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+
+      .panel-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .panel-label {
+        font-weight: 600;
+        margin-right: 6px;
+        white-space: nowrap;
+      }
+
+      .panel-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+        align-items: center;
+      }
+
+      .panel input[type="radio"] {
+        margin-right: 3px;
+      }
+
+      .slider-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 220px;
+      }
+
+      #costFactorSlider {
+        width: 140px;
+      }
+
       .legend {
         position: absolute;
         bottom: 20px;
         left: 20px;
         background: white;
         padding: 10px 12px;
-        border-radius: 4px;
+        border-radius: var(--border-radius);
         font-size: 12px;
-        box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+        box-shadow: var(--shadow);
       }
+
       .legend-title {
         font-weight: 600;
         margin-bottom: 4px;
       }
+
       .legend-row {
         display: flex;
         align-items: center;
         margin-bottom: 3px;
       }
+
       .legend-color {
         width: 14px;
         height: 14px;
         margin-right: 6px;
         border-radius: 2px;
       }
-      .info {
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        background: rgba(255, 255, 255, 0.9);
-        padding: 8px 10px;
-        border-radius: 4px;
-        font-size: 12px;
-        max-width: 320px;
-        box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+
+      .info-text {
+        margin-bottom: 4px;
+      }
+
+      @media (max-width: 700px) {
+        .panel {
+          max-width: none;
+        }
       }
     </style>
   </head>
   <body>
     <div id="map"></div>
 
-    <div class="info">
-      <strong>Forgotten City – Residual Land Value Map</strong><br />
-      Each tract is colored by the income-based residual land value per unit.
-      Red = negative (subsidy needed), Blue = positive (feasible). Click a tract
-      for the GEOID and value.
+    <div class="panel">
+      <div class="info-text">
+        <strong>Forgotten City – Residual Land Value Explorer</strong><br />
+        Adjust assumptions below. Map shows income-based residual land value per
+        unit: red = negative (subsidy needed), blue = positive (feasible).
+      </div>
+
+      <div class="panel-row">
+        <span class="panel-label">Building type</span>
+        <div class="panel-group">
+          <label>
+            <input
+              type="radio"
+              name="buildingType"
+              value="mf"
+              checked
+            />
+            Small multifamily
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="buildingType"
+              value="sf"
+            />
+            Single-family
+          </label>
+        </div>
+      </div>
+
+      <div class="panel-row">
+        <span class="panel-label">Income share</span>
+        <div class="panel-group">
+          <label>
+            <input
+              type="radio"
+              name="incomeShare"
+              value="0.30"
+              checked
+            />
+            30%
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="incomeShare"
+              value="0.35"
+            />
+            35%
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="incomeShare"
+              value="0.40"
+            />
+            40%
+          </label>
+        </div>
+      </div>
+
+      <div class="panel-row">
+        <span class="panel-label">Construction cost</span>
+        <div class="slider-wrapper">
+          <input
+            type="range"
+            id="costFactorSlider"
+            min="70"
+            max="150"
+            value="100"
+          />
+          <span id="costFactorLabel">100% of baseline</span>
+        </div>
+      </div>
     </div>
 
     <div class="legend">
-      <div class="legend-title">L_income_based (USD per unit)</div>
+      <div class="legend-title">Residual land value (L) per unit</div>
       <div class="legend-row">
         <div class="legend-color" style="background:#b2182b;"></div>
         <span>More negative (less feasible)</span>
@@ -91,53 +224,96 @@
     </div>
 
     <script>
-      // Your Mapbox public access token
+      // === MAPBOX SETUP ===
       mapboxgl.accessToken =
         "pk.eyJ1IjoibWVibG9vbWJlcmciLCJhIjoiY20ycWw5b3JmMTNtdTJsb21lYWZpemIyMCJ9.P-EVTtAL-ZTeKTNGCFW6Fw";
+
+      const TILESET_URL = "mapbox://mebloomberg.b8cuu3jw";
+      const SOURCE_LAYER_NAME = "tracts_residual_multi_base-auqwu3";
 
       const map = new mapboxgl.Map({
         container: "map",
         style: "mapbox://styles/mapbox/light-v11",
-        center: [-98.5, 39.8], // US center
+        center: [-98.5, 39.8],
         zoom: 3.3,
       });
 
       map.addControl(new mapboxgl.NavigationControl(), "top-right");
 
+      // === STATE FOR CONTROLS ===
+      let currentBuildingType = "mf"; // "mf" or "sf"
+      let currentIncomeShare = 0.3; // 0.30, 0.35, 0.40
+      let currentCostFactor = 1.0; // 0.7–1.5
+
+      function getShareFactor() {
+        // P_base is at 30% of income; scale linearly with share
+        return currentIncomeShare / 0.3;
+      }
+
+      function getCostFactor() {
+        return currentCostFactor;
+      }
+
+      function makeFillColorExpression() {
+        const shareFactor = getShareFactor();
+        const costFactor = getCostFactor();
+
+        const costField =
+          currentBuildingType === "mf"
+            ? "C_ex_land_small_multifamily_base"
+            : "C_ex_land_single_family_base";
+
+        const L_expr = [
+          "-",
+          ["*", ["get", "P_income_base"], shareFactor],
+          ["*", ["get", costField], costFactor],
+        ];
+
+        return [
+          "case",
+          [
+            "all",
+            ["==", ["typeof", ["get", "P_income_base"]], "number"],
+            ["==", ["typeof", ["get", costField]], "number"],
+          ],
+          [
+            "interpolate",
+            ["linear"],
+            L_expr,
+            -100000,
+            "#b2182b",
+            0,
+            "#f7f7f7",
+            600000,
+            "#2166ac",
+          ],
+          "#cccccc",
+        ];
+      }
+
+      function updateMapStyle() {
+        if (!map.getLayer("tract-fills")) return;
+        const expr = makeFillColorExpression();
+        map.setPaintProperty("tract-fills", "fill-color", expr);
+      }
+
       map.on("load", () => {
-        // Your tileset as the vector source
         map.addSource("tracts", {
           type: "vector",
-          url: "mapbox://mebloomberg.d66j6kmh",
+          url: TILESET_URL,
         });
 
-        const SOURCE_LAYER_NAME = "tracts_residual_small_multifa-dryy5y";
-
-        // Choropleth fill layer
         map.addLayer({
           id: "tract-fills",
           type: "fill",
           source: "tracts",
           "source-layer": SOURCE_LAYER_NAME,
           paint: {
-            "fill-color": [
-              "case",
-              ["==", ["typeof", ["get", "L_income_based"]], "number"],
-              [
-                "interpolate",
-                ["linear"],
-                ["get", "L_income_based"],
-                -100000, "#b2182b",
-                0, "#f7f7f7",
-                600000, "#2166ac"
-              ],
-              "#cccccc"
-            ],
+            "fill-color": makeFillColorExpression(),
             "fill-opacity": 0.7,
           },
         });
 
-        // Borders / outlines
         map.addLayer({
           id: "tract-borders",
           type: "line",
@@ -149,14 +325,15 @@
               "interpolate",
               ["linear"],
               ["zoom"],
-              3, 0.1,
-              8, 0.4,
+              3,
+              0.1,
+              8,
+              0.4,
             ],
             "line-opacity": 0.3,
           },
         });
 
-        // Popup
         const popup = new mapboxgl.Popup({
           closeButton: false,
           closeOnClick: true,
@@ -165,24 +342,52 @@
         map.on("click", "tract-fills", (e) => {
           const props = e.features[0].properties;
           const geoid = props.GEOID || "Unknown GEOID";
-          const val = props.L_income_based;
 
-          const valText =
-            val !== null && val !== undefined && !isNaN(val)
-              ? Number(val).toLocaleString("en-US", {
+          const P_base = Number(props.P_income_base);
+          const C_mf = Number(props.C_ex_land_small_multifamily_base);
+          const C_sf = Number(props.C_ex_land_single_family_base);
+
+          const shareFactor = getShareFactor();
+          const costFactor = getCostFactor();
+
+          const C_base = currentBuildingType === "mf" ? C_mf : C_sf;
+
+          const P = P_base * shareFactor;
+          const C = C_base * costFactor;
+          const L = P - C;
+
+          const fmt = (val) =>
+            isFinite(val)
+              ? val.toLocaleString("en-US", {
                   style: "currency",
                   currency: "USD",
                   maximumFractionDigits: 0,
                 })
               : "N/A";
 
+          const buildingLabel =
+            currentBuildingType === "mf" ? "Small multifamily" : "Single-family";
+
           popup
             .setLngLat(e.lngLat)
             .setHTML(
               "<strong>GEOID:</strong> " +
                 geoid +
-                "<br><strong>L_income_based:</strong> " +
-                valText
+                "<br><strong>Building type:</strong> " +
+                buildingLabel +
+                "<br><strong>Income share:</strong> " +
+                Math.round(currentIncomeShare * 100) +
+                "%" +
+                "<br><strong>Construction cost factor:</strong> " +
+                Math.round(currentCostFactor * 100) +
+                "% of baseline" +
+                "<hr style='margin:4px 0;'/>" +
+                "<strong>P (income-based value):</strong> " +
+                fmt(P) +
+                "<br><strong>C (ex land):</strong> " +
+                fmt(C) +
+                "<br><strong>L = P - C:</strong> " +
+                fmt(L)
             )
             .addTo(map);
         });
@@ -195,6 +400,35 @@
           map.getCanvas().style.cursor = "";
         });
       });
+
+      // === CONTROL WIRING ===
+      const costSlider = document.getElementById("costFactorSlider");
+      const costLabel = document.getElementById("costFactorLabel");
+
+      costSlider.addEventListener("input", () => {
+        const val = Number(costSlider.value); // 70–150
+        currentCostFactor = val / 100.0;
+        costLabel.textContent = `${val}% of baseline`;
+        updateMapStyle();
+      });
+
+      document
+        .querySelectorAll('input[name="buildingType"]')
+        .forEach((el) => {
+          el.addEventListener("change", () => {
+            currentBuildingType = el.value; // "mf" or "sf"
+            updateMapStyle();
+          });
+        });
+
+      document
+        .querySelectorAll('input[name="incomeShare"]')
+        .forEach((el) => {
+          el.addEventListener("change", () => {
+            currentIncomeShare = Number(el.value);
+            updateMapStyle();
+          });
+        });
     </script>
   </body>
 </html>
