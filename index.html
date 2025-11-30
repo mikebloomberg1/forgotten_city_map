@@ -45,6 +45,10 @@
         font-size: 12px;
       }
 
+      .info-text {
+        margin-bottom: 4px;
+      }
+
       .panel-row {
         display: flex;
         flex-wrap: wrap;
@@ -112,10 +116,6 @@
         height: 14px;
         margin-right: 6px;
         border-radius: 2px;
-      }
-
-      .info-text {
-        margin-bottom: 4px;
       }
 
       /* Data sources box */
@@ -253,7 +253,7 @@
       let currentCostFactor = 1.0; // 0.7–1.5
 
       function getShareFactor() {
-        // P_base is at 30% of income; scale linearly with share
+        // P_income_base is at 30% of income; scale linearly with share
         return currentIncomeShare / 0.3;
       }
 
@@ -382,7 +382,6 @@
           const buildingLabel =
             currentBuildingType === "mf" ? "Small multifamily" : "Single-family";
 
-          // Try to pull median income, state abbr, multiplier, and cost-per-sqft if present
           const medianIncome = Number(
             props.median_household_income ?? props.median_income
           );
@@ -390,9 +389,12 @@
           const multiplier = props.multiplier
             ? Number(props.multiplier)
             : NaN;
-          const costPerSqft = props.cost_per_sqft_state
-            ? Number(props.cost_per_sqft_state)
-            : NaN;
+
+          // Use the SF/MF base cost-per-ft² fields from the tileset
+          const costPerSqft =
+            currentBuildingType === "mf"
+              ? Number(props.cost_per_sqft_mf_base || NaN)
+              : Number(props.cost_per_sqft_sf_base || NaN);
 
           const L_color = L >= 0 ? "blue" : "red";
 
@@ -474,4 +476,3 @@
     </script>
   </body>
 </html>
-
