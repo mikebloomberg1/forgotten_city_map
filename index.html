@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
   <head>
@@ -16,7 +15,8 @@
         --bg: rgba(255, 255, 255, 0.95);
         --shadow: 0 0 6px rgba(0, 0, 0, 0.25);
         --border-radius: 6px;
-        --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
       }
 
       body {
@@ -118,9 +118,27 @@
         margin-bottom: 4px;
       }
 
+      /* Data sources box */
+      #data-info {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        background: white;
+        padding: 10px 12px;
+        border-radius: var(--border-radius);
+        font-size: 11px;
+        box-shadow: var(--shadow);
+        max-width: 260px;
+        line-height: 1.4;
+      }
+
       @media (max-width: 700px) {
         .panel {
           max-width: none;
+        }
+
+        #data-info {
+          max-width: 200px;
         }
       }
     </style>
@@ -139,20 +157,11 @@
         <span class="panel-label">Building type</span>
         <div class="panel-group">
           <label>
-            <input
-              type="radio"
-              name="buildingType"
-              value="mf"
-              checked
-            />
+            <input type="radio" name="buildingType" value="mf" checked />
             Small multifamily
           </label>
           <label>
-            <input
-              type="radio"
-              name="buildingType"
-              value="sf"
-            />
+            <input type="radio" name="buildingType" value="sf" />
             Single-family
           </label>
         </div>
@@ -162,28 +171,15 @@
         <span class="panel-label">Income share</span>
         <div class="panel-group">
           <label>
-            <input
-              type="radio"
-              name="incomeShare"
-              value="0.30"
-              checked
-            />
+            <input type="radio" name="incomeShare" value="0.30" checked />
             30%
           </label>
           <label>
-            <input
-              type="radio"
-              name="incomeShare"
-              value="0.35"
-            />
+            <input type="radio" name="incomeShare" value="0.35" />
             35%
           </label>
           <label>
-            <input
-              type="radio"
-              name="incomeShare"
-              value="0.40"
-            />
+            <input type="radio" name="incomeShare" value="0.40" />
             40%
           </label>
         </div>
@@ -221,6 +217,17 @@
         <div class="legend-color" style="background:#2166ac;"></div>
         <span>More positive (more feasible)</span>
       </div>
+    </div>
+
+    <!-- Data sources / assumptions box -->
+    <div id="data-info">
+      <strong>Data & assumptions</strong><br />
+      Income: ACS 5-year 2018–2022 (median household income by tract).<br />
+      Construction baselines (ex land, incl. profit):<br />
+      &nbsp;&nbsp;• SF: $162/ft² (NAHB Cost of Constructing a Home, 2024).<br />
+      &nbsp;&nbsp;• Small MF: $200/ft² (industry low-rise baseline).<br />
+      State costs = baseline × modeled cost multiplier. C (ex land) = unit size
+      × state cost/ft². L = P − C.
     </div>
 
     <script>
@@ -356,7 +363,7 @@
           const C = C_base * costFactor;
           const L = P - C;
 
-          const fmt = (val) =>
+          const fmtCurrency = (val) =>
             isFinite(val)
               ? val.toLocaleString("en-US", {
                   style: "currency",
@@ -365,31 +372,66 @@
                 })
               : "N/A";
 
+          const fmtNumber = (val) =>
+            isFinite(val)
+              ? val.toLocaleString("en-US", {
+                  maximumFractionDigits: 0,
+                })
+              : "N/A";
+
           const buildingLabel =
             currentBuildingType === "mf" ? "Small multifamily" : "Single-family";
 
-          popup
-            .setLngLat(e.lngLat)
-            .setHTML(
-              "<strong>GEOID:</strong> " +
-                geoid +
-                "<br><strong>Building type:</strong> " +
-                buildingLabel +
-                "<br><strong>Income share:</strong> " +
-                Math.round(currentIncomeShare * 100) +
-                "%" +
-                "<br><strong>Construction cost factor:</strong> " +
-                Math.round(currentCostFactor * 100) +
-                "% of baseline" +
-                "<hr style='margin:4px 0;'/>" +
-                "<strong>P (income-based value):</strong> " +
-                fmt(P) +
-                "<br><strong>C (ex land):</strong> " +
-                fmt(C) +
-                "<br><strong>L = P - C:</strong> " +
-                fmt(L)
-            )
-            .addTo(map);
+          // Try to pull median income, state abbr, multiplier, and cost-per-sqft if present
+          const medianIncome = Number(
+            props.median_household_income ?? props.median_income
+          );
+          const stateAbbr = props.state_abbr || "";
+          const multiplier = props.multiplier
+            ? Number(props.multiplier)
+            : NaN;
+          const costPerSqft = props.cost_per_sqft_state
+            ? Number(props.cost_per_sqft_state)
+            : NaN;
+
+          const L_color = L >= 0 ? "blue" : "red";
+
+          const html = `
+            <div style="font-size:13px; line-height:1.4;">
+              <strong>GEOID:</strong> ${geoid}<br/>
+              <strong>Building type:</strong> ${buildingLabel}<br/>
+              <strong>Income share:</strong> ${Math.round(
+                currentIncomeShare * 100
+              )}%<br/>
+              <strong>Construction cost factor:</strong> ${Math.round(
+                currentCostFactor * 100
+              )}% of baseline
+              <hr style="margin:4px 0;"/>
+              <strong>P (income-based value):</strong> ${fmtCurrency(P)}<br/>
+              <strong>C (ex land):</strong> ${fmtCurrency(C)}<br/>
+              <strong>L = P − C:</strong>
+              <span style="color:${L_color}; font-weight:600;">
+                ${fmtCurrency(L)}
+              </span>
+              <hr style="margin:4px 0;"/>
+              <strong>Data for this tract</strong><br/>
+              <strong>Median household income:</strong>
+              ${fmtCurrency(medianIncome)}<br/>
+              <em>Source: ACS 5-year 2018–2022</em><br/><br/>
+              <strong>State:</strong> ${stateAbbr || "N/A"}<br/>
+              <strong>State cost multiplier:</strong>
+              ${isFinite(multiplier) ? multiplier.toFixed(2) : "N/A"}<br/>
+              <strong>Effective cost per ft²:</strong>
+              ${isFinite(costPerSqft) ? "$" + fmtNumber(costPerSqft) + "/ft²" : "N/A"}<br/><br/>
+              <small style="opacity:0.7;">
+                Baselines (ex land, incl. profit): SF = $162/ft² (NAHB 2024),
+                Small MF = $200/ft² (industry). State costs are baseline ×
+                multiplier. C (ex land) = unit size × state cost/ft². L = P − C.
+              </small>
+            </div>
+          `;
+
+          popup.setLngLat(e.lngLat).setHTML(html).addTo(map);
         });
 
         map.on("mouseenter", "tract-fills", () => {
@@ -432,3 +474,4 @@
     </script>
   </body>
 </html>
+
